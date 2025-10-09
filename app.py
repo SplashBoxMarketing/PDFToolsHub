@@ -4,6 +4,7 @@ from logic.toc_linker import process_pdf as process_toc
 import os
 import io, zipfile
 from flask import jsonify
+from logic.billtracker import build_excel, build_excel_from_rows
 
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = (
