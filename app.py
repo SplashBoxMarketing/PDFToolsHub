@@ -3,6 +3,7 @@ from logic.billtracker import build_excel
 from logic.toc_linker import process_pdf as process_toc
 import os
 import io, zipfile
+from flask import jsonify
 
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = (
@@ -26,6 +27,18 @@ def require_auth(fn):
 
     wrapper.__name__ = fn.__name__
     return wrapper
+
+
+@app.post("/billtracker-json")
+def bill_post_json():
+    data = request.get_json(silent=True) or {}
+    rows = data.get("rows", [])
+    if not rows:
+        return jsonify({"error": "No rows provided"}), 400
+
+    # Build the Excel from provided rows (no PDFs uploaded)
+    out = build_excel_from_rows(rows)
+    return send_file(out, as_attachment=True, download_name="pdf_page_counts.xlsx")
 
 
 @app.get("/")

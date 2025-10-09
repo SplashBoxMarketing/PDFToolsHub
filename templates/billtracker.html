@@ -1,15 +1,93 @@
 {% extends "base.html" %}
 {% block content %}
 <div class="card">
-  <h2>Billing Tracker</h2>
-  <form method="post" enctype="multipart/form-data">
-    {% if require_pw %}
-      <label>Team Password <input type="password" name="password" required></label>
-    {% endif %}
-    <label>Select PDFs (multiple):
-      <input type="file" name="pdfs" accept="application/pdf" multiple required>
-    </label>
-    <p><button type="submit">Generate Excel</button></p>
-  </form>
+  <h2>Billing Tracker (no upload)</h2>
+  <p>Select PDFs. We’ll count pages in your browser and only send the counts to the server.</p>
+
+  <label>Select PDFs (multiple):
+    <input id="pdfs" type="file" accept="application/pdf" multiple>
+  </label>
+
+  <p>
+    <button id="goBtn" type="button">Generate Excel</button>
+  </p>
+
+  <div id="status" style="white-space:pre; font-family:monospace;"></div>
 </div>
+
+<!-- PDF.js (vanilla build from CDN) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.js"
+        integrity="sha512-+Kp+rJk4qvT2h0+U9o4Z7l7d8q8o5v7lD8C1Yx6zS9s74GkYFDV9k1nQ9U8YqJQ0v8X6rN3XbF9K4lObf4G8Gg=="
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script>
+const $ = (s)=>document.querySelector(s);
+const statusEl = $("#status");
+const goBtn = $("#goBtn");
+const input = $("#pdfs");
+
+async function countPages(file) {
+  statusEl.textContent += `Reading: ${file.name}\n`;
+  const buf = await file.arrayBuffer();
+  const loadingTask = window.pdfjsLib.getDocument({ data: buf });
+  const pdf = await loadingTask.promise;
+  const n = pdf.numPages;
+  statusEl.textContent += `  Pages: ${n}\n`;
+  pdf.destroy?.();
+  return n;
+}
+
+goBtn.onclick = async () => {
+  const files = Array.from(input.files || []);
+  if (!files.length) {
+    alert("Please select PDFs first.");
+    return;
+  }
+  goBtn.disabled = true;
+  statusEl.textContent = "Counting pages...\n";
+
+  const rows = [];
+  for (const f of files) {
+    try {
+      const n = await countPages(f);
+      rows.push({
+        "Filename": f.name,
+        "Page Count": n,
+        "Complete Y/N": "",
+        "Note": ""
+      });
+    } catch (e) {
+      statusEl.textContent += `  ERROR: ${f.name}: ${e}\n`;
+      rows.push({
+        "Filename": f.name,
+        "Page Count": "ERROR",
+        "Complete Y/N": "",
+        "Note": "Failed to read"
+      });
+    }
+  }
+
+  statusEl.textContent += "\nUploading counts to generate Excel...\n";
+  const resp = await fetch("/billtracker-json", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ rows })
+  });
+  if (!resp.ok) {
+    const text = await resp.text();
+    statusEl.textContent += `Server error: ${resp.status}\n${text}\n`;
+    goBtn.disabled = false;
+    return;
+  }
+  // Download the Excel
+  const blob = await resp.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "pdf_page_counts.xlsx";
+  a.click();
+  URL.revokeObjectURL(url);
+  statusEl.textContent += "Done.\n";
+  goBtn.disabled = false;
+};
+</script>
 {% endblock %}

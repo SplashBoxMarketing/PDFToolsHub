@@ -8,6 +8,53 @@ from openpyxl import load_workbook
 import fitz  # PyMuPDF
 
 
+def build_excel_from_rows(rows):
+    # rows = [{"Filename": "...", "Page Count": 12, "Complete Y/N": "", "Note": ""}, ...]
+    today = date.today().strftime("%Y-%m-%d")
+    norm = []
+    for r in rows:
+        norm.append(
+            {
+                "Filename": r.get("Filename") or r.get("filename") or "file.pdf",
+                "Page Count": r.get("Page Count") or r.get("page_count") or "",
+                "Complete Y/N": r.get("Complete Y/N", ""),
+                "Note": r.get("Note", ""),
+                "Date Received": r.get("Date Received") or today,
+                "Date Complete": r.get("Date Complete", ""),
+            }
+        )
+
+    df = pd.DataFrame(
+        norm,
+        columns=[
+            "Filename",
+            "Page Count",
+            "Complete Y/N",
+            "Note",
+            "Date Received",
+            "Date Complete",
+        ],
+    )
+
+    buf = io.BytesIO()
+    with pd.ExcelWriter(buf, engine="openpyxl") as writer:
+        df.to_excel(writer, index=False)
+    buf.seek(0)
+    wb = load_workbook(buf)
+    ws = wb.active
+    for col in ws.columns:
+        max_len = 0
+        col_letter = col[0].column_letter
+        for cell in col:
+            if cell.value:
+                max_len = max(max_len, len(str(cell.value)))
+        ws.column_dimensions[col_letter].width = max_len + 2
+    out = io.BytesIO()
+    wb.save(out)
+    out.seek(0)
+    return out
+
+
 def _page_count_from_filestorage(fs) -> int | None:
     try:
         # Read the uploaded file fully into memory once
