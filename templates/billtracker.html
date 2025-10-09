@@ -15,22 +15,49 @@
   <div id="status" style="white-space:pre; font-family:monospace;"></div>
 </div>
 
-<!-- PDF.js -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.js"></script>
+<!-- PDF.js with fallback -->
 <script>
-  // Make sure pdfjsLib is present and set the worker explicitly
-  if (!window.pdfjsLib) {
-    document.getElementById("status").textContent =
-      "ERROR: PDF.js failed to load. Please check your network or try again.";
-  } else {
-    pdfjsLib.GlobalWorkerOptions.workerSrc =
-      "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.js";
-  }
-const $ = (s)=>document.querySelector(s);
-const statusEl = $("#status");
-const goBtn = $("#goBtn");
-const input = $("#pdfs");
+  (function loadPdfJs(primary, fallback) {
+    function setWorker() {
+      if (!window.pdfjsLib) return false;
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = primary.replace("pdf.min.js", "pdf.worker.min.js");
+      return true;
+    }
+    function inject(src, onload) {
+      var s = document.createElement("script");
+      s.src = src; s.async = true; s.crossOrigin = "anonymous";
+      s.onload = onload; s.onerror = function () {
+        // Try fallback if primary fails
+        if (src === primary && fallback) inject(fallback, function () {
+          // set worker using fallback URL
+          if (window.pdfjsLib) {
+            window.pdfjsLib.GlobalWorkerOptions.workerSrc = fallback.replace("pdf.min.js", "pdf.worker.min.js");
+          }
+        });
+        else {
+          // Surface a friendly message and disable the button
+          var st = document.getElementById("status"), btn = document.getElementById("goBtn");
+          if (st) st.textContent = "ERROR: PDF.js failed to load. Please check your network or try again.";
+          if (btn) btn.disabled = true;
+        }
+      };
+      document.head.appendChild(s);
+    }
+
+    // Primary: jsDelivr; Fallback: cdnjs (versions known-good with globals)
+    inject(
+      "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js",
+      function () { setWorker() || (function(){
+        // If pdfjsLib is still missing after onload, try the fallback
+        inject("https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js", setWorker);
+      })(); }
+    );
+  })();
+
+const $ = (s) => document.querySelector(s);
+const statusEl = document.getElementById("status");
+const goBtn = document.getElementById("goBtn");
+const input = document.getElementById("pdfs");
 
 async function countPages(file) {
   statusEl.textContent += `Reading: ${file.name}\n`;
