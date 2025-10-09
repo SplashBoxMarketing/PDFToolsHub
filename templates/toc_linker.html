@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <h2>TOC Linker</h2>
+  <form method="post" enctype="multipart/form-data">
+    {% if require_pw %}
+      <label>Team Password <input type="password" name="password" required></label>
+    {% endif %}
+    <label>Final PDF:
+      <input type="file" name="pdf" accept="application/pdf" required>
+    </label>
+    <label>TOC pages (1-based, e.g., 6 or 6-8):
+      <input type="text" name="range" placeholder="6-8" required>
+    </label>
+    <p><button type="submit">Create Linked PDF</button></p>
+  </form>
+</div>
+{% endblock %}

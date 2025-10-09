@@ -1,0 +1,29 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>PDF Tools</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body{font-family:system-ui,Segoe UI,Roboto,Arial,sans-serif;max-width:900px;margin:24px auto;padding:0 16px}
+    header{margin-bottom:16px}
+    .card{border:1px solid #ddd;border-radius:12px;padding:16px;margin:16px 0}
+    label{display:block;margin-top:10px}
+    input[type="text"], input[type="password"]{width:100%;padding:8px}
+    button{padding:10px 16px;border-radius:10px;border:1px solid #ccc;background:#f7f7f7;cursor:pointer}
+  </style>
+</head>
+<body>
+<header>
+  <h1>PDF Tools</h1>
+  <nav>
+    <a href="{{ url_for('index') }}">Home</a> ·
+    <a href="{{ url_for('bill_get') }}">Billing Tracker</a> ·
+    <a href="{{ url_for('toc_get') }}">TOC Linker</a>
+  </nav>
+</header>
+<main>
+  {% block content %}{% endblock %}
+</main>
+</body>
+</html>
