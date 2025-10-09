@@ -2,24 +2,31 @@
 import io, os
 from datetime import date
 import pandas as pd
-from pypdf import PdfReader
+
+# from pypdf import PdfReader  # <- no longer needed for counting
 from openpyxl import load_workbook
+import fitz  # PyMuPDF
 
 
 def _page_count_from_filestorage(fs) -> int | None:
     try:
-        fs.stream.seek(0)
-        reader = PdfReader(fs.stream)
-        if getattr(reader, "is_encrypted", False):
-            try:
-                reader.decrypt("")
-            except Exception:
-                pass
-            fs.stream.seek(0)
-            reader = PdfReader(fs.stream)
-        return len(reader.pages)
+        # Read the uploaded file fully into memory once
+        data = fs.read()
+        if not data:
+            return None
+        # Use PyMuPDF: very memory-efficient page count
+        doc = fitz.open(stream=data, filetype="pdf")
+        pc = doc.page_count
+        doc.close()
+        return pc
     except Exception:
         return None
+    finally:
+        # Reset stream in case anything upstream reuses it (defensive)
+        try:
+            fs.stream.seek(0)
+        except Exception:
+            pass
 
 
 def build_excel(file_storages, filename_col="Filename"):
@@ -51,10 +58,10 @@ def build_excel(file_storages, filename_col="Filename"):
         ],
     )
 
-    # Write to Excel in-memory
     buf = io.BytesIO()
     with pd.ExcelWriter(buf, engine="openpyxl") as writer:
         df.to_excel(writer, index=False)
+
     # Auto-fit columns
     buf.seek(0)
     wb = load_workbook(buf)

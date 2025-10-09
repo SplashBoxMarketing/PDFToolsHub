@@ -4,6 +4,10 @@ from logic.toc_linker import process_pdf as process_toc
 import os
 
 app = Flask(__name__)
+app.config["MAX_CONTENT_LENGTH"] = (
+    100 * 1024 * 1024
+)  # 100 MB total per request; adjust as needed
+
 # Optional very simple shared password
 APP_PASSWORD = os.getenv("APP_PASSWORD", "")
 
