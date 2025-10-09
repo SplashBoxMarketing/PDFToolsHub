@@ -7,6 +7,9 @@ TOC_LINE_RE = re.compile(
     r"^(?P<title>.*?)(?:[\s\.\u2026·•]*?)(?P<num>\d+)(?:[\s\.\u2026·•]*)$"
 )
 
+# FAST MODE: disable label lookups to avoid heavy memory/CPU on small instances
+USE_LABELS = False
+
 
 def parse_range(text: str):
     t = text.strip()
@@ -25,6 +28,8 @@ def parse_range(text: str):
 
 
 def _numeric_label(page) -> int | None:
+    if not USE_LABELS:
+        return None
     try:
         lbl = page.get_label()
         if not lbl:
@@ -36,7 +41,11 @@ def _numeric_label(page) -> int | None:
 
 
 def _find_index_by_numeric_label(doc, wanted_num: int, start_from: int) -> int | None:
-    for i in range(max(0, start_from), len(doc)):
+    if not USE_LABELS:
+        return None
+    # If you later flip USE_LABELS=True, keep the scan bounded (faster):
+    end = min(len(doc), start_from + 50)  # search at most the next 50 pages
+    for i in range(max(0, start_from), end):
         n = _numeric_label(doc.load_page(i))
         if n == wanted_num:
             return i
