@@ -6,8 +6,8 @@
     {% if require_pw %}
       <label>Team Password <input type="password" name="password" required></label>
     {% endif %}
-    <label>Final PDF:
-      <input type="file" name="pdf" accept="application/pdf" required>
+    <label>Final PDF(s):
+      <input type="file" name="pdfs" accept="application/pdf" multiple required>
     </label>
     <label>TOC pages (1-based, e.g., 6 or 6-8):
       <input type="text" name="range" placeholder="6-8" required>

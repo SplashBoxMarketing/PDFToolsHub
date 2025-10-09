@@ -2,6 +2,7 @@ from flask import Flask, render_template, request, send_file, redirect, url_for,
 from logic.billtracker import build_excel
 from logic.toc_linker import process_pdf as process_toc
 import os
+import io, zipfile
 
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = (
@@ -55,13 +56,42 @@ def toc_get():
 @app.post("/toc-linker")
 @require_auth
 def toc_post():
-    pdf = request.files.get("pdf")
+    # Gather all uploaded PDFs (now multiple supported)
+    pdfs = request.files.getlist("pdfs")
     rng = request.form.get("range", "").strip()
-    if not pdf or not rng:
+
+    if not pdfs or not rng:
         return redirect(url_for("toc_get"))
-    out = process_toc(pdf, rng)
-    name = (pdf.filename or "output.pdf").rsplit(".", 1)[0] + "_TOCLinked.pdf"
-    return send_file(out, as_attachment=True, download_name=name)
+
+    # If only one file, keep the simple single-PDF response
+    if len(pdfs) == 1:
+        pdf = pdfs[0]
+        out = process_toc(pdf, rng)
+        name = (pdf.filename or "output.pdf").rsplit(".", 1)[0] + "_TOCLinked.pdf"
+        return send_file(out, as_attachment=True, download_name=name)
+
+    # For multiple files, process each and return a ZIP
+    zip_buf = io.BytesIO()
+    with zipfile.ZipFile(zip_buf, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
+        for pdf in pdfs:
+            if not pdf or not pdf.filename:
+                continue
+            try:
+                out = process_toc(pdf, rng)
+                out_name = pdf.filename.rsplit(".", 1)[0] + "_TOCLinked.pdf"
+                zf.writestr(out_name, out.getvalue())
+            except Exception as e:
+                # If a file fails, include a small .txt error entry so the user knows which one failed
+                err_name = pdf.filename.rsplit(".", 1)[0] + "_ERROR.txt"
+                zf.writestr(err_name, f"Failed to process: {pdf.filename}\n{e}")
+
+    zip_buf.seek(0)
+    return send_file(
+        zip_buf,
+        as_attachment=True,
+        download_name="TOCLinked_Batch.zip",
+        mimetype="application/zip",
+    )
 
 
 if __name__ == "__main__":
