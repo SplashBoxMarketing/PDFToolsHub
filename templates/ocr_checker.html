@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <h2>OCR Detector</h2>
+  <p>Upload one or more PDFs. Each file will be scanned page-by-page and flagged for OCR needs. Download an Excel report when done.</p>
+
+  <label>Select PDFs (single or whole folder batch):
+    <input id="pdfInput" type="file" accept="application/pdf" multiple>
+  </label>
+
+  <p>
+    <button id="goBtn" type="button">Scan &amp; Download Report</button>
+  </p>
+
+  <div id="progressWrap" style="display:none; margin-top:12px;">
+    <div style="background:#eee; border-radius:8px; overflow:hidden; height:16px;">
+      <div id="progressBar" style="height:100%; width:0%; background:#4a90d9; transition:width 0.2s;"></div>
+    </div>
+    <div id="progressLabel" style="font-size:0.85em; margin-top:4px; color:#555;"></div>
+  </div>
+
+  <div id="status" style="white-space:pre; font-family:monospace; margin-top:12px; font-size:0.85em;"></div>
+</div>
+
+<script>
+const input       = document.getElementById("pdfInput");
+const goBtn       = document.getElementById("goBtn");
+const statusEl    = document.getElementById("status");
+const progressWrap = document.getElementById("progressWrap");
+const progressBar  = document.getElementById("progressBar");
+const progressLabel = document.getElementById("progressLabel");
+
+goBtn.onclick = async () => {
+  const files = Array.from(input.files || []);
+  if (!files.length) { alert("Please select at least one PDF."); return; }
+
+  goBtn.disabled = true;
+  statusEl.textContent = "";
+  progressWrap.style.display = "block";
+  progressBar.style.width = "0%";
+
+  const formData = new FormData();
+  for (const f of files) formData.append("pdfs", f);
+
+  progressLabel.textContent = `Uploading ${files.length} file(s)…`;
+
+  // Fake upload progress pulse while waiting
+  let pct = 0;
+  const pulse = setInterval(() => {
+    pct = Math.min(pct + 2, 85);
+    progressBar.style.width = pct + "%";
+  }, 300);
+
+  try {
+    const resp = await fetch("/ocr-checker", {
+      method: "POST",
+      body: formData
+    });
+
+    clearInterval(pulse);
+    progressBar.style.width = "100%";
+
+    if (!resp.ok) {
+      const text = await resp.text();
+      statusEl.textContent = `Server error ${resp.status}:\n${text}`;
+      goBtn.disabled = false;
+      return;
+    }
+
+    progressLabel.textContent = "Done! Downloading report…";
+
+    const blob = await resp.blob();
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement("a");
+    a.href = url;
+    a.download = "ocr_report.xlsx";
+    a.click();
+    URL.revokeObjectURL(url);
+
+    statusEl.textContent = `✅ Report downloaded for ${files.length} file(s).`;
+  } catch (err) {
+    clearInterval(pulse);
+    statusEl.textContent = `Error: ${err}`;
+  }
+
+  goBtn.disabled = false;
+};
+</script>
+{% endblock %}
